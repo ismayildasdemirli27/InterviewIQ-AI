@@ -773,15 +773,40 @@ export const generateQwenChatText = async (
         2
       )}s`
     );
-  } else {
-    console.warn(
-      `[Qwen Service] Conversational response failed after ${elapsedSeconds.toFixed(
-        2
-      )}s: ${result.error ||
-      "Unknown error"
-      }`
-    );
+    return result;
   }
+
+  // Graceful Gemini fallback if Qwen local service fails or is unreachable
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const { generateGeminiText } = await import("./geminiService.js");
+      const systemMessage = input.messages.find((m) => m.role === "system")?.content;
+      const userMessages = input.messages
+        .filter((m) => m.role !== "system")
+        .map((m) => m.content)
+        .join("\n\n");
+      const geminiRes = await generateGeminiText(userMessages, systemMessage);
+      if (geminiRes.success && geminiRes.data) {
+        console.log("[Qwen Service] Recovered via Gemini fallback successfully");
+        return {
+          success: true,
+          text: geminiRes.data,
+          model: "gemini-fallback",
+          finishReason: "stop",
+        };
+      }
+    } catch {
+      // ignore fallback error and return original result
+    }
+  }
+
+  console.warn(
+    `[Qwen Service] Conversational response failed after ${elapsedSeconds.toFixed(
+      2
+    )}s: ${result.error ||
+    "Unknown error"
+    }`
+  );
 
   return result;
 };
