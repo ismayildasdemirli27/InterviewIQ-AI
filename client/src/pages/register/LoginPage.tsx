@@ -140,6 +140,30 @@ const LoginPage = () => {
   ] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token) {
+      setLoading(true);
+      apiClient
+        .get("/auth/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((res) => {
+          if (res.data?.success && res.data?.data) {
+            saveAuthSession(token, res.data.data);
+            navigate("/dashboard", { replace: true });
+          }
+        })
+        .catch(() => {
+          setError("Direct login failed. Please sign in manually.");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [navigate]);
+
+  useEffect(() => {
     const savedEmail =
       localStorage.getItem(
         "interviewiq_remember_email"
