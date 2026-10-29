@@ -342,9 +342,9 @@ const callFastAPIQwen = async (
   const baseUrl =
     getQwenServiceBaseUrl();
 
-  const endpoint =
-    `${baseUrl}/generate`;
-  const transportOptions = aiProxyRequestOptions(baseUrl);
+  const isOllama = baseUrl.includes("11434");
+  const endpoint = isOllama ? `${baseUrl}/api/generate` : `${baseUrl}/generate`;
+  const transportOptions = isOllama ? {} : aiProxyRequestOptions(baseUrl);
 
   const timeoutMs =
     options.timeoutMs ??
@@ -393,7 +393,24 @@ const callFastAPIQwen = async (
     const remaining=options.deadlineAtMs===undefined?timeoutMs:Math.min(timeoutMs,options.deadlineAtMs-Date.now());
     if(!Number.isFinite(remaining)||remaining<=0)throw new Error('Qwen request deadline expired before dispatch');
     const budget=Math.min(300_000,Math.max(1,Math.floor(remaining)));
-    const outbound={...payload,request_budget_ms:budget,deadline_unix_ms:Date.now()+budget,correlation_id:generationCorrelationId() || careerChatCorrelationId() || interviewCorrelationId()};
+    const outbound = isOllama
+      ? {
+          model: process.env.QWEN_MODEL || "qwen2.5-coder:1.5b",
+          prompt: payload.message,
+          system: payload.system || "",
+          stream: false,
+          options: {
+            temperature: payload.temperature,
+            top_p: payload.top_p,
+            num_predict: payload.max_tokens,
+          },
+        }
+      : {
+          ...payload,
+          request_budget_ms: budget,
+          deadline_unix_ms: Date.now() + budget,
+          correlation_id: generationCorrelationId() || careerChatCorrelationId() || interviewCorrelationId(),
+        };
     const wireBody=JSON.stringify(outbound);
     const promptBytes=Buffer.byteLength(JSON.stringify({message:payload.message,system:payload.system}));
     countGenerationMetric('finalPayloadBytes',Buffer.byteLength(wireBody));

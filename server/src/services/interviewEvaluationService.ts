@@ -15,6 +15,7 @@ import { timeInterviewStage, recordInterviewEvaluationProtocol } from './intervi
 import qwenService, {
   IQwenJSONResult,
 } from "./qwenService";
+import { generateGeminiJSON } from "./geminiService";
 
 /* =========================================================
    TYPES
@@ -554,34 +555,49 @@ export const evaluateInterviewAnswer =
       throw new InterviewEvaluationError('EVALUATION_INPUT_INVALID');
     }
 
-    const response:
-      IQwenJSONResult<
-        InterviewEvaluation
-      > =
-      await qwenService.generateQwenJSON<
-        InterviewEvaluation
-      >({
-        messages: [
-          {
-            role:
-              "user",
+    const evaluationPrompt = createInterviewEvaluationPrompt(input);
+    let response: IQwenJSONResult<InterviewEvaluation> | undefined;
 
-            content:
-              createInterviewEvaluationPrompt(
-                input
-              ),
-          },
-        ],
+    if (process.env.INTERVIEW_EVALUATION_PROVIDER === "gemini" && process.env.GEMINI_API_KEY) {
+      try {
+        const geminiResult = await generateGeminiJSON<InterviewEvaluation>(evaluationPrompt);
+        if (geminiResult.success && geminiResult.data) {
+          response = {
+            success: true,
+            data: geminiResult.data,
+            rawText: geminiResult.rawText,
+          };
+        }
+      } catch (geminiError) {
+        console.warn("[Interview Evaluation] Gemini call failed, falling back to Qwen:", geminiError);
+      }
+    }
 
-        temperature:
-          0.2,
-        timeoutMs: 60_000,
-        retries: 0,
-        maxCompletionTokens: 1024,
-      });
+    if (!response) {
+      response =
+        await qwenService.generateQwenJSON<
+          InterviewEvaluation
+        >({
+          messages: [
+            {
+              role:
+                "user",
 
-    if (response.finishReason === 'length') {
-      throw new InterviewEvaluationError('EVALUATION_OUTPUT_TRUNCATED');
+              content:
+                evaluationPrompt,
+            },
+          ],
+
+          temperature:
+            0.2,
+          timeoutMs: 60_000,
+          retries: 0,
+          maxCompletionTokens: 1024,
+        });
+
+      if (response.finishReason === 'length') {
+        throw new InterviewEvaluationError('EVALUATION_OUTPUT_TRUNCATED');
+      }
     }
     if (
       !response.success ||

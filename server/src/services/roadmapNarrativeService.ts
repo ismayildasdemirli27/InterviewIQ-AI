@@ -9,6 +9,7 @@ import type { ICareerGoalMilestone, ICareerGoalGap } from './careerGoalService';
 import { buildRoadmapSectionSeeds } from './roadmapPlanningService';
 import { getKnowledgeNarrativeIdentity } from './careerKnowledgeService';
 import { generateQwenJSON } from './qwenService';
+import { generateGeminiJSON } from './geminiService';
 import { measureRoadmapStage, readRoadmapEvidence } from './roadmapEvidenceScope';
 import { getNarrativeText, putNarrativeText, canRequestNarrative, recordInvalidNarrative } from './roadmapNarrativeCache';
 import { NARRATIVE_POLICY, stableHash, planNarrativeNodes, applyNodeText, type NarrativePlannerInput, type NarrativeText } from './roadmapNarrativePlanner';
@@ -161,9 +162,23 @@ export async function generateRoadmapNarratives(input: NarrativePlannerInput & {
         metrics.promptTokensEstimate = Math.ceil(metrics.promptBytes / 4);
         for (const name of ['generatedNodes', 'promptBytes', 'promptTokensEstimate'] as const) countGenerationMetric(name, metrics[name]);
         countGenerationMetric('qwenCalls');
-            const response = await measureRoadmapStage('qwen', () => timeGenerationStage('qwen', () => generateQwenJSON<{
-                nodes?: unknown;
-            }>({ messages, temperature: 0.35, topP: 0.9, maxCompletionTokens: 1800, timeoutMs: 300000, retries: 0, ...inferenceContext })), value => value.success);
+            let response: any;
+            if (process.env.ROADMAP_NARRATIVE_PROVIDER === 'gemini' && process.env.GEMINI_API_KEY) {
+                try {
+                    const prompt = messages.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n\n');
+                    const geminiRes = await generateGeminiJSON<{ nodes?: unknown }>(prompt);
+                    if (geminiRes.success && geminiRes.data) {
+                        response = { success: true, data: geminiRes.data };
+                    }
+                } catch (gErr) {
+                    console.warn('[Roadmap Narrative] Gemini failed, falling back to Qwen:', gErr);
+                }
+            }
+            if (!response || !response.success) {
+                response = await measureRoadmapStage('qwen', () => timeGenerationStage('qwen', () => generateQwenJSON<{
+                    nodes?: unknown;
+                }>({ messages, temperature: 0.35, topP: 0.9, maxCompletionTokens: 1800, timeoutMs: 300000, retries: 0, ...inferenceContext })), value => value.success);
+            }
             if (!response.success) countGenerationMetric('qwenFailures');
             for (const [source, target] of [['promptTokens', 'promptTokensActual'], ['completionTokens', 'completionTokensActual']] as const) {
                 const value = response.usage?.[source];
