@@ -7,6 +7,15 @@
    - Resume Analysis / Performance Progress
 ========================================================= */
 
+import dns from "node:dns";
+
+// Ensure IPv4 first on Windows to avoid connect timeouts
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {
+  // Ignore in environments without setDefaultResultOrder
+}
+
 export interface IGeminiGenerateOptions {
   model?: string;
   temperature?: number;
@@ -20,6 +29,13 @@ export interface IGeminiResult<T = string> {
   error?: string;
 }
 
+const CANDIDATE_MODELS = [
+  "gemini-flash-latest",
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemma-4-26b-a4b-it",
+];
+
 export const generateGeminiText = async (
   prompt: string,
   systemPrompt?: string,
@@ -30,8 +46,8 @@ export const generateGeminiText = async (
     return { success: false, error: "GEMINI_API_KEY is not configured." };
   }
 
-  const model = options?.model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const primaryModel = options?.model || process.env.GEMINI_MODEL || "gemini-flash-latest";
+  const modelsToTry = [primaryModel, ...CANDIDATE_MODELS.filter((m) => m !== primaryModel)];
 
   const contents: any[] = [];
   if (systemPrompt) {
@@ -50,30 +66,44 @@ export const generateGeminiText = async (
     parts: [{ text: prompt }],
   });
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: options?.temperature ?? 0.7,
-          maxOutputTokens: options?.maxTokens ?? 2048,
-        },
-      }),
-    });
+  let lastError = "Failed to call Gemini API";
 
-    const data = await response.json();
-    if (!response.ok) {
-      const errMsg = data?.error?.message || `HTTP ${response.status}`;
-      return { success: false, error: errMsg };
+  for (const model of modelsToTry) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            temperature: options?.temperature ?? 0.7,
+            maxOutputTokens: options?.maxTokens ?? 2048,
+          },
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        lastError = data?.error?.message || `HTTP ${response.status} from ${model}`;
+        // If high demand (503) or not found (404), try next model in candidate list
+        if (response.status === 503 || response.status === 404) {
+          continue;
+        }
+        return { success: false, error: lastError };
+      }
+
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (text) {
+        return { success: true, data: text, rawText: text };
+      }
+    } catch (error: any) {
+      lastError = error?.message || `Network error with ${model}`;
     }
-
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    return { success: true, data: text, rawText: text };
-  } catch (error: any) {
-    return { success: false, error: error?.message || "Failed to call Gemini API" };
   }
+
+  return { success: false, error: lastError };
 };
 
 export const generateGeminiJSON = async <T>(
@@ -101,3 +131,4 @@ export const generateGeminiJSON = async <T>(
     return { success: false, error: `Invalid JSON response: ${err.message}`, rawText: res.data };
   }
 };
+

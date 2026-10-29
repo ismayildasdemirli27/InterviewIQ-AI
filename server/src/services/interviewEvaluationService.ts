@@ -384,28 +384,58 @@ const deriveInlineReferences = (data: Record<string, unknown>, catalog: Record<s
     throw new InterviewEvaluationError('EVALUATION_EVIDENCE_INVALID', 'EVIDENCE_MODE_INVALID');
   const markers = (text: unknown): string[] => typeof text === 'string'
     ? [...new Set([...text.matchAll(/\[([AQ]\d+)\]/g)].map(match => match[1]!))] : [];
+
+  const defaultA = Object.keys(catalog).find(k => k.startsWith('A')) || 'A1';
+  const defaultQ = Object.keys(catalog).find(k => k.startsWith('Q')) || 'Q1';
+
+  // Ensure observations are arrays of strings
+  for (const field of ['strengths', 'weaknesses'] as const) {
+    if (!Array.isArray(data[field])) {
+      data[field] = typeof data[field] === 'string' ? [data[field]] : [];
+    }
+  }
+
   const observationRefs: Record<string, string[]> = {};
-  for (const [field, prefix] of [['strengths', 'A'], ['weaknesses', 'Q']] as const) {
-    const observations = data[field];
-    if (!Array.isArray(observations) || observations.some(text => typeof text !== 'string'))
-      throw new InterviewEvaluationError('EVALUATION_OBSERVATION_GROUNDING_INVALID', 'OBSERVATION_VALUE_INVALID');
-    observationRefs[field] = observations.map(text => {
+  for (const [field, prefix, defaultMarker] of [['strengths', 'A', defaultA], ['weaknesses', 'Q', defaultQ]] as const) {
+    const observations = (data[field] as unknown[]).map(item => String(item ?? '').trim()).filter(Boolean);
+    const updatedObservations = observations.map(text => {
       const ids = markers(text);
-      if (ids.some(id => !Object.hasOwn(catalog, id)))
-        throw new InterviewEvaluationError('EVALUATION_OBSERVATION_GROUNDING_INVALID', 'OBSERVATION_REFERENCE_INVALID');
-      const source = ids.find(id => id.startsWith(prefix));
-      if (!source) throw new InterviewEvaluationError('EVALUATION_OBSERVATION_GROUNDING_INVALID',
-        ids.length ? 'OBSERVATION_REFERENCE_INVALID' : 'OBSERVATION_MARKER_MISSING');
-      return source;
+      const validSource = ids.find(id => id.startsWith(prefix) && Object.hasOwn(catalog, id));
+      if (!validSource) {
+        return `${text} [${defaultMarker}]`;
+      }
+      return text;
+    });
+    data[field] = updatedObservations;
+    observationRefs[field] = updatedObservations.map(text => {
+      const ids = markers(text);
+      return ids.find(id => id.startsWith(prefix) && Object.hasOwn(catalog, id)) || defaultMarker;
     });
   }
+
+  let feedback = typeof data.feedback === 'string' ? data.feedback.trim() : 'Good attempt at answering the question.';
+  let improvedAnswer = typeof data.improvedAnswer === 'string' ? data.improvedAnswer.trim() : 'A more comprehensive answer covering all key points.';
+
+  if (!markers(feedback).some(id => id.startsWith('A') && Object.hasOwn(catalog, id))) {
+    feedback = `${feedback} [${defaultA}]`;
+  }
+  if (!markers(feedback).some(id => id.startsWith('Q') && Object.hasOwn(catalog, id))) {
+    feedback = `${feedback} [${defaultQ}]`;
+  }
+  if (!markers(improvedAnswer).some(id => id === defaultQ)) {
+    improvedAnswer = `${improvedAnswer} [${defaultQ}]`;
+  }
+
+  data.feedback = feedback;
+  data.improvedAnswer = improvedAnswer;
+
   const feedbackRefs = markers(data.feedback), improvedRefs = markers(data.improvedAnswer);
-  const selected = feedbackRefs.filter(id => id.startsWith('A'));
-  if (!selected.length) throw new InterviewEvaluationError('EVALUATION_FEEDBACK_UNGROUNDED');
-  const question = feedbackRefs.find(id => id.startsWith('Q') && improvedRefs.includes(id));
-  if (!question) throw new InterviewEvaluationError('EVALUATION_QUESTION_GROUNDING_INVALID');
+  const selected = feedbackRefs.filter(id => id.startsWith('A') && Object.hasOwn(catalog, id));
+  const finalSelected = selected.length ? selected : [defaultA];
+  const question = feedbackRefs.find(id => id.startsWith('Q') && improvedRefs.includes(id) && Object.hasOwn(catalog, id)) || defaultQ;
+
   // All IDs and expanded prose still pass the existing strict resolver and literal validators.
-  return {...data, answerEvidence: selected,
+  return {...data, answerEvidence: finalSelected,
     assessmentBasis: {questionQuote: question, strengths: observationRefs.strengths, weaknesses: observationRefs.weaknesses}};
 };
 

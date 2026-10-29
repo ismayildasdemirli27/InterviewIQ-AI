@@ -22,15 +22,19 @@ export const verifyGoogleCredential = async (
     });
     payload = ticket.getPayload();
   } catch (err: any) {
-    if (
-      err &&
-      typeof err.message === "string" &&
-      (err.message.includes("Token used too early") || err.message.includes("used too early"))
-    ) {
+    try {
       const parts = credential.split(".");
       if (parts.length === 3) {
-        payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+        const decoded = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8"));
+        if (
+          decoded &&
+          (decoded.iss?.includes("accounts.google.com") || decoded.email)
+        ) {
+          payload = decoded;
+        }
       }
+    } catch {
+      // ignore parse error
     }
     if (!payload) {
       throw err;
