@@ -1,6 +1,14 @@
 import './mongoSafety';
+import dns from 'node:dns';
 import mongoose from 'mongoose';
 import { env } from './env';
+
+try {
+  dns.setServers(['1.1.1.1', '8.8.8.8']);
+} catch {
+  // Ignore DNS config errors if running in restricted environments
+}
+
 export const connectDB = async (): Promise<void> => {
   try {
     await mongoose.connect(env.MONGO_URI, {autoIndex:false, autoCreate:false, serverSelectionTimeoutMS:15000});
