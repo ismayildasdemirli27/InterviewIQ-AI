@@ -30,10 +30,10 @@ export interface IGeminiResult<T = string> {
 }
 
 const CANDIDATE_MODELS = [
-  "gemini-flash-latest",
   "gemini-3.5-flash-lite",
-  "gemini-3.8-flash",
+  "gemini-flash-latest",
   "gemma-4-26b-a4b-it",
+  "gemini-3.8-flash",
 ];
 
 export const generateGeminiText = async (
@@ -75,6 +75,7 @@ export const generateGeminiText = async (
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(12000),
         body: JSON.stringify({
           contents,
           generationConfig: {
