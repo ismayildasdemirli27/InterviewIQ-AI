@@ -702,6 +702,30 @@ export const generateQwenChatText = async (
     "[Qwen Service] Starting conversational text generation..."
   );
 
+  // If Gemini provider is explicitly selected for career assistant, try Gemini first for lightning speed
+  if (process.env.CAREER_ASSISTANT_PROVIDER === "gemini" && process.env.GEMINI_API_KEY) {
+    try {
+      const { generateGeminiText } = await import("./geminiService.js");
+      const systemMessage = input.messages.find((m) => m.role === "system")?.content;
+      const userMessages = input.messages
+        .filter((m) => m.role !== "system")
+        .map((m) => m.content)
+        .join("\n\n");
+      const geminiRes = await generateGeminiText(userMessages, systemMessage);
+      if (geminiRes.success && geminiRes.data) {
+        console.log(`[Qwen Service] Answered via Gemini in ${((Date.now() - startedAt) / 1000).toFixed(2)}s`);
+        return {
+          success: true,
+          text: geminiRes.data,
+          model: "gemini-flash-latest",
+          finishReason: "stop",
+        };
+      }
+    } catch (gErr) {
+      console.warn("[Qwen Service] Gemini chat attempt failed, continuing with Qwen:", gErr);
+    }
+  }
+
   const result =
     await generateQwenText({
       ...input,
