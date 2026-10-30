@@ -1647,219 +1647,67 @@ export const buildCareerNextStepsContext =
       ICareerKnowledgeContext | undefined;
 
     /* =====================================================
-       PERSONALIZED STORED ROADMAP
+       PARALLEL CONTEXT FETCHING
+       Runs stored roadmap, resume, career knowledge,
+       interview, and progress concurrently for speed.
     ===================================================== */
-
-    /*
- * Stored personalized roadmap belongs to the user's
- * saved career automation.
- *
- * For an explicit SKILL_GAP request we must NOT blindly
- * use that roadmap, because the requested role may be
- * different from the user's saved career goal.
- */
-    if (
-      !input.knowledgeSubject
-    ) {
-      storedRoadmap =
-        preparedRoadmap ? preparedRoadmap.roadmap.filter(item=>!item.metadata?.retainedForCompletedTasks) : await resolveStoredRoadmap(
-          userId,input.targetRole
-        );
-    }
-
-    /* =====================================================
-       RESUME
-    ===================================================== */
-
-    try {
-      const resumeResult =
-        await resolveResumeContext({
-          userId,
-
-          activeResumeId:
-            input.activeResumeId,
-        });
-
-      if (
-        resumeResult.found &&
-        resumeResult.data
-      ) {
-        resume =
-          resumeResult.data;
-      }
-    } catch (
-    error
-    ) {
-      console.error(
-        "[Career Next Steps] Resume context failed:",
-        error
-      );
-    }
-
-    /* =====================================================
-   TARGET ROLE CAREER KNOWLEDGE
-===================================================== */
 
     const requestedKnowledgeRole =
       normalizeString(
         input.knowledgeSubject
       );
 
-    if (
-      requestedKnowledgeRole
-    ) {
-      try {
-        careerKnowledge =
-          await buildCareerKnowledgeContext({
-            targetRole:
-              requestedKnowledgeRole,
-
-            userSkills:
-              (
-                resume?.skillsDetected ??
-                []
-              ).map(
-                (skill) => ({
-                  name:
-                    skill,
-                })
-              ),
-
-            includeStrongTopics:
-              false,
-
-            maxTopics:
-              16,
-
-            maxPriorityTopics:
-              12,
-          });
-
-        console.log(
-          "[Career Next Steps] CareerKnowledge loaded:",
-          {
-            knowledgeSubject:
-              requestedKnowledgeRole,
-
-            savedTargetRole:
-              input.targetRole,
-
-            found:
-              careerKnowledge.found,
-
-            resolvedRole:
-              careerKnowledge
-                .resolvedRole
-                ?.title,
-
-            priorityTopics:
-              careerKnowledge
-                .priorityTopics
-                ?.map(
-                  (item) =>
-                    item.topic.name
-                ),
-          }
-        );
-      } catch (error) {
-        console.error(
-          "[Career Next Steps] CareerKnowledge failed:",
-          error
-        );
-      }
-    }
-
-    /* =====================================================
-       JOB MATCHING
-    ===================================================== */
-
-    if (
-      resume
-    ) {
-      try {
-        const jobResult =
-          await getCareerJobMatches({
-            userId,
-
-            activeResumeId:
-              resume.id,
-
-            targetRole:
-              input.targetRole,
-
-            limit:
-              5,
-          });
-
-        if (
-          jobResult.found
-        ) {
-          jobMatches =
-            jobResult;
-        }
-      } catch (
-      error
-      ) {
-        console.error(
-          "[Career Next Steps] Job context failed:",
-          error
-        );
-      }
-    }
-
-    /* =====================================================
-       INTERVIEW
-    ===================================================== */
-
-    try {
-      const interviewResult =
-        await resolveCareerInterviewContext({
+    const [resolvedRoadmap, resumeResult, careerKnowledgeLoaded, interviewResult, progressResult] =
+      await Promise.all([
+        !input.knowledgeSubject
+          ? (preparedRoadmap
+              ? Promise.resolve(preparedRoadmap.roadmap.filter(item=>!item.metadata?.retainedForCompletedTasks))
+              : resolveStoredRoadmap(userId, input.targetRole).catch(() => []))
+          : Promise.resolve([]),
+        resolveResumeContext({
           userId,
+          activeResumeId: input.activeResumeId,
+        }).catch((err) => {
+          console.error("[Career Next Steps] Resume context failed:", err);
+          return { found: false, data: undefined };
+        }),
+        requestedKnowledgeRole
+          ? buildCareerKnowledgeContext({
+              targetRole: requestedKnowledgeRole,
+              userSkills: [],
+              includeStrongTopics: false,
+              maxTopics: 16,
+              maxPriorityTopics: 12,
+            }).catch((err) => {
+              console.error("[Career Next Steps] CareerKnowledge failed:", err);
+              return undefined;
+            })
+          : Promise.resolve(undefined),
+        resolveCareerInterviewContext({
+          userId,
+          activeInterviewId: input.activeInterviewId,
+        }).catch((err) => {
+          console.error("[Career Next Steps] Interview context failed:", err);
+          return { found: false, data: undefined };
+        }),
+        buildCareerProgressContext(userId).catch((err) => {
+          console.error("[Career Next Steps] Progress context failed:", err);
+          return { found: false, data: undefined };
+        }),
+      ]);
 
-          activeInterviewId:
-            input.activeInterviewId,
-        });
-
-      if (
-        interviewResult.found &&
-        interviewResult.data
-      ) {
-        interview =
-          interviewResult.data;
-      }
-    } catch (
-    error
-    ) {
-      console.error(
-        "[Career Next Steps] Interview context failed:",
-        error
-      );
+    storedRoadmap = resolvedRoadmap || [];
+    if (resumeResult?.found && resumeResult.data) {
+      resume = resumeResult.data;
     }
-
-    /* =====================================================
-       CAREER PROGRESS
-    ===================================================== */
-
-    try {
-      const progressResult =
-        await buildCareerProgressContext(
-          userId
-        );
-
-      if (
-        progressResult.found &&
-        progressResult.data
-      ) {
-        progress =
-          progressResult.data;
-      }
-    } catch (
-    error
-    ) {
-      console.error(
-        "[Career Next Steps] Progress context failed:",
-        error
-      );
+    if (careerKnowledgeLoaded) {
+      careerKnowledge = careerKnowledgeLoaded;
+    }
+    if (interviewResult?.found && interviewResult.data) {
+      interview = interviewResult.data;
+    }
+    if (progressResult?.found && progressResult.data) {
+      progress = progressResult.data;
     }
 
     /* =====================================================

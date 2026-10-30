@@ -1768,42 +1768,45 @@ const runCustomerMessage =
 
     /* =====================================================
        STEP 2
-       SYNC FRONTEND CONTEXT
+       SYNC FRONTEND CONTEXT (only when updates exist)
     ===================================================== */
 
-    await syncCareerContext({
-      ...input,
+    const hasContextUpdates =
+      input.activeResumeId !== undefined ||
+      input.activeJobId !== undefined ||
+      input.activeInterviewId !== undefined ||
+      input.targetRole !== undefined ||
+      input.careerGoal !== undefined ||
+      input.skillsFocus !== undefined;
 
-      sessionId,
-    });
+    if (hasContextUpdates) {
+      await syncCareerContext({
+        ...input,
+        sessionId,
+      });
 
-    conversation =
-      await getOrCreateConversation(
-        sessionId
-      );
+      conversation =
+        await getOrCreateConversation(
+          sessionId
+        );
+    }
 
     /* =====================================================
-       STEP 3
-       CURRENT CONTEXT
+       STEP 3 & 4
+       CURRENT CONTEXT & ML INTENT (Parallelized)
     ===================================================== */
 
-    const activeCareer=input.userId ? await resolveActiveCareer(String(input.userId)) : null;
+    const [activeCareer, prediction] = await Promise.all([
+      input.userId ? resolveActiveCareer(String(input.userId)) : Promise.resolve(null),
+      predictCSIntent(message),
+    ]);
+
     const contextForConversation=(value:typeof conversation)=>conversationCareerContext(buildConversationContext(value),activeCareer);
     const currentContext = contextForConversation(conversation);
 
     const wasAwaitingField =
       Boolean(
         currentContext.awaitingField
-      );
-
-    /* =====================================================
-       STEP 4
-       ML INTENT
-    ===================================================== */
-
-    const prediction =
-      await predictCSIntent(
-        message
       );
 
     /* =====================================================
@@ -2039,7 +2042,7 @@ const runCustomerMessage =
       !wasAwaitingField &&
       !isContextualOverride
     ) {
-      await collectLearningCandidateSafely({
+      collectLearningCandidateSafely({
         message,
 
         intent:
@@ -2060,7 +2063,7 @@ const runCustomerMessage =
 
         needsClarification:
           prediction.needsClarification,
-      });
+      }).catch((err) => console.warn("[Career Assistant] Learning collection error:", err));
     }
 
     /* =====================================================

@@ -36,17 +36,17 @@ export async function loadRoadmapEvidence(input: ICareerGoalInput & { userId: st
     const profile = await skillPromise;
     return buildCareerKnowledgeContext({ targetRole: input.targetRole.trim(), userSkills: profile?.skills.map(skill => ({ name:skill.name, score:skill.skillScore, confidence:skill.confidence, verified:skill.interviewVerified, sources:skill.sources.map(String) })) || [], maxTopics:18,maxPriorityTopics:10,maxInterviewTopics:6,maxScenarios:5,includeStrongTopics:false });
   });
-  const jobsPromise = optional('job-matches', async () => {
+  const jobsPromise = input.skipHeavyJobs ? Promise.resolve(undefined) : optional('job-matches', async () => {
     const resume = await resumePromise;
     if (!resume) return undefined;
     const value = await getCareerJobMatches({ userId, activeResumeId:resume.id,targetRole:input.targetRole.trim(),limit:5 });
     return value.found ? value : undefined;
   });
-  const assessmentPromise = optional('skill-assessment', async () => {
+  const assessmentPromise = input.skipHeavyJobs ? Promise.resolve(undefined) : optional('skill-assessment', async () => {
     const resume=await resumePromise;
     return loadSkillEvidenceAssessment({userId,resumeAnalysisId:resume?.id,reuseRoadmapSources:true});
   });
   const [resume,interview,progress,careerSkillProfile,careerKnowledge,jobMatches,assessment] = await Promise.all([resumePromise,interviewPromise,progressPromise,skillPromise,knowledgePromise,jobsPromise,assessmentPromise]);
-  const learningPlan = timeGenerationStage('planner',()=>planCareerLearning({userId,targetRole:input.targetRole,assessment,knowledge:careerKnowledge}));
+  const learningPlan = assessment && careerKnowledge ? timeGenerationStage('planner',()=>planCareerLearning({userId,targetRole:input.targetRole,assessment,knowledge:careerKnowledge})) : undefined;
   return { resume,interview,progress,careerSkillProfile,careerKnowledge,jobMatches,learningPlan,narrativeSourceComplete:sourceFailures===0 };
 }

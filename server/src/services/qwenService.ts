@@ -711,7 +711,11 @@ export const generateQwenChatText = async (
         .filter((m) => m.role !== "system")
         .map((m) => m.content)
         .join("\n\n");
-      const geminiRes = await generateGeminiText(userMessages, systemMessage);
+      const geminiRes = await generateGeminiText(userMessages, systemMessage, {
+        model: "gemini-3.5-flash-lite",
+        maxTokens: 800,
+        temperature: 0.5,
+      });
       if (geminiRes.success && geminiRes.data) {
         console.log(`[Qwen Service] Answered via Gemini in ${((Date.now() - startedAt) / 1000).toFixed(2)}s`);
         return {
@@ -809,7 +813,11 @@ export const generateQwenChatText = async (
         .filter((m) => m.role !== "system")
         .map((m) => m.content)
         .join("\n\n");
-      const geminiRes = await generateGeminiText(userMessages, systemMessage);
+      const geminiRes = await generateGeminiText(userMessages, systemMessage, {
+        model: "gemini-3.5-flash-lite",
+        maxTokens: 800,
+        temperature: 0.5,
+      });
       if (geminiRes.success && geminiRes.data) {
         console.log("[Qwen Service] Recovered via Gemini fallback successfully");
         return {

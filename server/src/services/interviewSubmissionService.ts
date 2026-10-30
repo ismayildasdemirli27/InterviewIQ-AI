@@ -49,7 +49,7 @@ export async function commitInterviewSubmission<T>(work:(session:ClientSession)=
     const released=await interviewSubmissionStore.release(lease,session);
     if(released.modifiedCount!==1)throw new InterviewSubmissionError(409,'INTERVIEW_COMMIT_CONFLICT');
     return result;
-  },{readConcern:{level:'snapshot'},writeConcern:{w:'majority'},readPreference:'primary',maxCommitTimeMS:15000}));
+  },{readConcern:{level:'local'},writeConcern:{w:1},readPreference:'primary',maxCommitTimeMS:5000}));
   lease.committed=true;
   return result;
 }

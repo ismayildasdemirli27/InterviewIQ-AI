@@ -186,6 +186,8 @@ export interface ICareerGoalInput {
   targetRole?: string;
 
   careerGoal?: string;
+
+  skipHeavyJobs?: boolean;
 }
 
 const runBuildCareerGoalContext =
@@ -728,7 +730,7 @@ export const buildCareerGoalContext = (input: ICareerGoalInput, previous?: Narra
 
 // Reading chat context must never become an implicit roadmap generation action.
 export const buildCareerGoalChatContext = (input: ICareerGoalInput): Promise<ICareerGoalResult> =>
-  withRoadmapEvidence(input.userId || "", () => runBuildCareerGoalContext(input, undefined, true));
+  withRoadmapEvidence(input.userId || "", () => runBuildCareerGoalContext({ ...input, skipHeavyJobs: true }, undefined, true));
 
 export default {
   buildCareerGoalContext,
