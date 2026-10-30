@@ -1,4 +1,3 @@
-# Template only. Account configuration and deployment require separate approval.
 services:
   - type: web
     name: interviewiq-api
@@ -8,12 +7,24 @@ services:
     dockerContext: .
     healthCheckPath: /health
     maxShutdownDelaySeconds: 300
-    autoDeployTrigger: "off"
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
       - key: ENABLE_STARTUP_RECOVERY
         value: "false"
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: CAREER_ASSISTANT_PROVIDER
+        value: gemini
+      - key: INTERVIEW_EVALUATION_PROVIDER
+        value: gemini
+      - key: ROADMAP_NARRATIVE_PROVIDER
+        value: gemini
+      - key: RESUME_ANALYSIS_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
       - key: QWEN_REQUIRE_SECURE_PROXY
         value: "true"
       - key: QWEN_DEBUG
