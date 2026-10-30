@@ -16,7 +16,7 @@ declare module "axios" {
 const apiClient = axios.create({
   baseURL:
     import.meta.env.VITE_API_URL ||
-    "http://localhost:5000/api/v1",
+    (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://interviewiq-api.onrender.com/api/v1" : "http://localhost:5000/api/v1"),
 });
 
 apiClient.interceptors.request.use(

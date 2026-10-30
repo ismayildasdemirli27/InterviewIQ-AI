@@ -58,10 +58,13 @@ app.get('/health', (_req, res) => {
    CORS
 ========================================================= */
 
-const allowedOrigins = [
-  env.CLIENT_URL,
-  ...(process.env.RENDER === 'true' ? [] : ["http://localhost:5173", "http://localhost:3000"]),
-];
+const isOriginAllowed = (origin?: string): boolean => {
+  if (!origin) return true;
+  if (origin === env.CLIENT_URL) return true;
+  if (origin.endsWith('.vercel.app')) return true;
+  if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true;
+  return false;
+};
 
 app.use(
   cors({
@@ -71,9 +74,7 @@ app.use(
     ) => {
       if (
         !origin ||
-        allowedOrigins.includes(
-          origin
-        )
+        isOriginAllowed(origin)
       ) {
         callback(
           null,
