@@ -601,9 +601,23 @@ export const evaluateInterviewAnswer =
             data: geminiResult.data,
             rawText: geminiResult.rawText,
           };
+        } else {
+          // Retry with candidate fast fallback model
+          const retryResult = await generateGeminiJSON<InterviewEvaluation>(
+            evaluationPrompt,
+            undefined,
+            { model: "gemini-3.1-flash-lite", temperature: 0.2 }
+          );
+          if (retryResult.success && retryResult.data) {
+            response = {
+              success: true,
+              data: retryResult.data,
+              rawText: retryResult.rawText,
+            };
+          }
         }
       } catch (geminiError) {
-        console.warn("[Interview Evaluation] Gemini call failed, falling back to Qwen:", geminiError);
+        console.warn("[Interview Evaluation] Gemini call failed:", geminiError);
       }
     }
 
