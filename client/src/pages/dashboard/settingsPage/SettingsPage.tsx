@@ -82,7 +82,7 @@ const formatMemberSince = (
   ).format(date);
 };
 
-const settingsPage = () => {
+const SettingsPage = () => {
   const [profile, setProfile] =
     useState<ProfileData | null>(null);
 
@@ -1032,4 +1032,4 @@ const settingsPage = () => {
   );
 };
 
-export default settingsPage;
+export default SettingsPage;

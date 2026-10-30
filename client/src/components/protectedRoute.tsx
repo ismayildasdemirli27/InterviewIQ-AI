@@ -6,7 +6,7 @@ import {
 
 import { getAuthToken } from "../utils/authStorage";
 
-const protectedRoute = () => {
+const ProtectedRoute = () => {
   const location = useLocation();
 
   const token = getAuthToken();
@@ -26,4 +26,4 @@ const protectedRoute = () => {
   return <Outlet />;
 };
 
-export default protectedRoute;
+export default ProtectedRoute;

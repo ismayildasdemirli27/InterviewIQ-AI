@@ -4,6 +4,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/tests/*.test.ts",
     "scrape:career-sources": "tsx src/scripts/scrapeCareerSources.ts"
   },
   "devDependencies": {

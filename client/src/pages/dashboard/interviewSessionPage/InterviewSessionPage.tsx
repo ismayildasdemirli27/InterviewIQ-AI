@@ -131,7 +131,7 @@ interface BookmarkStatusResponse {
    COMPONENT
 ========================================= */
 
-const interviewSessionPage = () => {
+const InterviewSessionPage = () => {
   const navigate = useNavigate();
 
   const location =
@@ -1496,4 +1496,4 @@ const interviewSessionPage = () => {
   );
 };
 
-export default interviewSessionPage;
+export default InterviewSessionPage;

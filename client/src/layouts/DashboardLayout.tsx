@@ -53,7 +53,7 @@ const DashboardLayout: React.FC = () => {
   let user: {
     fullName?: string;
     email?: string;
-  } | null = null;
+  } | null;
 
   try {
     user =

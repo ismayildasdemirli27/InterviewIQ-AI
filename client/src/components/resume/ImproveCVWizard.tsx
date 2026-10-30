@@ -1020,7 +1020,7 @@ const parseMonthString = (
     return "";
   }
 
-  let cleaned =
+  const cleaned =
     value
       .trim()
       .replace(
