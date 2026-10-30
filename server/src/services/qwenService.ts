@@ -717,7 +717,7 @@ export const generateQwenChatText = async (
         return {
           success: true,
           text: geminiRes.data,
-          model: "gemini-flash-latest",
+          model: "gemini-3.5-flash-lite",
           finishReason: "stop",
         };
       }

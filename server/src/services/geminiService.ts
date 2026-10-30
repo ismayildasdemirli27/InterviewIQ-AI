@@ -31,8 +31,6 @@ export interface IGeminiResult<T = string> {
 
 const CANDIDATE_MODELS = [
   "gemini-3.5-flash-lite",
-  "gemini-flash-latest",
-  "gemma-4-26b-a4b-it",
   "gemini-3.8-flash",
 ];
 
@@ -79,8 +77,8 @@ export const generateGeminiText = async (
         body: JSON.stringify({
           contents,
           generationConfig: {
-            temperature: options?.temperature ?? 0.7,
-            maxOutputTokens: options?.maxTokens ?? 2048,
+            temperature: options?.temperature ?? 0.6,
+            maxOutputTokens: options?.maxTokens ?? 1500,
           },
         }),
       });

@@ -590,7 +590,11 @@ export const evaluateInterviewAnswer =
 
     if (process.env.INTERVIEW_EVALUATION_PROVIDER === "gemini" && process.env.GEMINI_API_KEY) {
       try {
-        const geminiResult = await generateGeminiJSON<InterviewEvaluation>(evaluationPrompt);
+        const geminiResult = await generateGeminiJSON<InterviewEvaluation>(
+          evaluationPrompt,
+          undefined,
+          { model: "gemini-3.5-flash-lite", temperature: 0.2 }
+        );
         if (geminiResult.success && geminiResult.data) {
           response = {
             success: true,
