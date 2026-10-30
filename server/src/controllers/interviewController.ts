@@ -1732,7 +1732,11 @@ export const submitInterviewAnswerController = (req: Request, res: Response, nex
       if(prepared.status!=='in_progress')return runSubmitInterviewAnswerController(req,res,next,prepared);
       const answer=prepared.answers.find(item=>String(item.question)===question);
       if(!answer || answer.evaluationStatus==='completed')return runSubmitInterviewAnswerController(req,res,next,prepared);
-      if(prepared.evaluationLease && new Date(prepared.evaluationLease.until).getTime()<=Date.now() && prepared.evaluationLease.dispatched!==false){res.status(409).json({success:false,code:'INTERVIEW_RECOVERY_REQUIRED',message:'The previous evaluation outcome is unknown. Verify model completion before recovering this submission.'});return;}
+      if(prepared.evaluationLease && new Date(prepared.evaluationLease.until).getTime()<=Date.now() && prepared.evaluationLease.dispatched!==false){
+        // Automatically release expired stuck lease so user can submit without 409 error
+        await Interview.collection.updateOne({_id:prepared._id},{$unset:{evaluationLease:''}});
+        delete prepared.evaluationLease;
+      }
       await withInterviewSubmission(String(owner),id,question,()=>runSubmitInterviewAnswerController(req,res,next,prepared));
     } catch(error) {
       if(error instanceof InterviewSubmissionError){res.status(error.status).json({success:false,code:error.code,message:'Evaluation is busy or question data changed. Please retry after the recovery window.'});return;}
