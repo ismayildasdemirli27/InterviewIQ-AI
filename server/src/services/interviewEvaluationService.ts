@@ -222,6 +222,14 @@ export const validateInterviewEvaluation = (
       >;
 
   recordInterviewEvaluationProtocol(data.evidenceVersion);
+
+  // Normalize numeric score fields in case model outputs strings like "100" instead of 100
+  for (const key of ['score', 'technicalAccuracy', 'completeness', 'communication']) {
+    if (typeof data[key] === 'string' && /^\d+$/.test((data[key] as string).trim())) {
+      data[key] = Number.parseInt((data[key] as string).trim(), 10);
+    }
+  }
+
   const missing = (keys: string[]) => keys.some(key => !Object.hasOwn(data, key) || data[key] === undefined);
   if (missing(['score', 'technicalAccuracy', 'completeness', 'communication']))
     throw new InterviewEvaluationError('EVALUATION_REQUIRED_FIELDS_MISSING');
