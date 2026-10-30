@@ -626,10 +626,31 @@ export const evaluateInterviewAnswer =
         }
       } catch (geminiError) {
         console.warn("[Interview Evaluation] Gemini call failed:", geminiError);
+        // Try one more Gemini model before giving up
+        try {
+          const lastResort = await generateGeminiJSON<InterviewEvaluation>(
+            evaluationPrompt,
+            undefined,
+            { model: "gemini-3.5-flash", temperature: 0.2 }
+          );
+          if (lastResort.success && lastResort.data) {
+            response = {
+              success: true,
+              data: lastResort.data,
+              rawText: lastResort.rawText,
+            };
+          }
+        } catch (lastErr) {
+          console.warn("[Interview Evaluation] Gemini last-resort also failed:", lastErr);
+        }
       }
     }
 
     if (!response) {
+      // Skip Qwen fallback when Gemini is the configured provider and Qwen/Ollama is offline
+      if (process.env.INTERVIEW_EVALUATION_PROVIDER === "gemini") {
+        throw new InterviewEvaluationError('EVALUATION_TRANSPORT_FAILED');
+      }
       response =
         await qwenService.generateQwenJSON<
           InterviewEvaluation
